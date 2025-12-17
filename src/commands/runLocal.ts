@@ -2,6 +2,7 @@
 // Licensed under the MIT license.
 
 import * as cp from "child_process";
+import * as crypto from "crypto";
 import * as fse from "fs-extra";
 import * as path from "path";
 import * as vscode from "vscode";
@@ -151,20 +152,38 @@ async function executeLocalTest(filePath: string, language: string, testInput: s
     }
 }
 
+// Helper function to generate secure temporary file names
+function generateTempFileName(extension: string): string {
+    const randomBytes = crypto.randomBytes(16).toString("hex");
+    return `leetcode_temp_${randomBytes}.${extension}`;
+}
+
+// Helper function to write test input to a file safely
+async function writeTestInputFile(dirName: string, testInput: string): Promise<string> {
+    const inputFile = path.join(dirName, generateTempFileName("txt"));
+    await fse.writeFile(inputFile, testInput, "utf-8");
+    return inputFile;
+}
+
 async function executePython(filePath: string, testInput: string, fileContent: string): Promise<string> {
-    // Extract the solution class/function
-    const tempFile = path.join(path.dirname(filePath), `__temp_test_${Date.now()}.py`);
+    const dirName = path.dirname(filePath);
+    const tempFile = path.join(dirName, generateTempFileName("py"));
+    const inputFile = await writeTestInputFile(dirName, testInput);
 
     try {
-        // Create a test runner
+        // Create a test runner that reads input from file
         const testCode = `
 ${fileContent}
 
 # Test runner
 if __name__ == "__main__":
     import json
-    # Parse input (assuming it's in JSON format or simple values)
-    test_input = ${JSON.stringify(testInput)}
+    import sys
+
+    # Read input from file instead of embedding it in code
+    with open(${JSON.stringify(inputFile)}, 'r') as f:
+        test_input = f.read().strip()
+
     print("Input:", test_input)
 
     # Try to parse as JSON
@@ -196,22 +215,29 @@ if __name__ == "__main__":
             throw error;
         }
     } finally {
-        // Clean up temp file
+        // Clean up temp files
         if (await fse.pathExists(tempFile)) {
             await fse.remove(tempFile);
+        }
+        if (await fse.pathExists(inputFile)) {
+            await fse.remove(inputFile);
         }
     }
 }
 
 async function executeJavaScript(filePath: string, testInput: string, fileContent: string): Promise<string> {
-    const tempFile = path.join(path.dirname(filePath), `__temp_test_${Date.now()}.js`);
+    const dirName = path.dirname(filePath);
+    const tempFile = path.join(dirName, generateTempFileName("js"));
+    const inputFile = await writeTestInputFile(dirName, testInput);
 
     try {
         const testCode = `
+const fs = require('fs');
+
 ${fileContent}
 
 // Test runner
-const testInput = ${JSON.stringify(testInput)};
+const testInput = fs.readFileSync(${JSON.stringify(inputFile)}, 'utf-8').trim();
 console.log("Input:", testInput);
 
 let args;
@@ -245,6 +271,9 @@ console.log("Output:", result);
         if (await fse.pathExists(tempFile)) {
             await fse.remove(tempFile);
         }
+        if (await fse.pathExists(inputFile)) {
+            await fse.remove(inputFile);
+        }
     }
 }
 
@@ -255,17 +284,20 @@ async function executeJava(_filePath: string, testInput: string, fileContent: st
         throw new Error("Could not find Java class name");
     }
 
-    const tempFile = path.join(dirName, `${className}_Test.java`);
+    const tempFile = path.join(dirName, generateTempFileName("java"));
+    const inputFile = await writeTestInputFile(dirName, testInput);
 
     try {
         const testCode = `
+import java.io.*;
+import java.nio.file.*;
 import java.util.*;
 
 ${fileContent}
 
-class ${className}_Test {
-    public static void main(String[] args) {
-        String testInput = "${testInput.replace(/"/g, '\\"')}";
+class LeetCodeTest {
+    public static void main(String[] args) throws IOException {
+        String testInput = new String(Files.readAllBytes(Paths.get(${JSON.stringify(inputFile)})));
         System.out.println("Input: " + testInput);
 
         // Create solution instance
@@ -283,15 +315,19 @@ class ${className}_Test {
         await executeCommand("javac", [tempFile]);
 
         // Run
-        return await executeCommand("java", ["-cp", dirName, `${className}_Test`]);
+        const baseName = path.basename(tempFile, ".java");
+        return await executeCommand("java", ["-cp", dirName, baseName]);
     } finally {
         // Cleanup
-        const classFile = path.join(dirName, `${className}_Test.class`);
+        const classFile = path.join(dirName, path.basename(tempFile, ".java") + ".class");
         if (await fse.pathExists(tempFile)) {
             await fse.remove(tempFile);
         }
         if (await fse.pathExists(classFile)) {
             await fse.remove(classFile);
+        }
+        if (await fse.pathExists(inputFile)) {
+            await fse.remove(inputFile);
         }
     }
 }
@@ -302,19 +338,25 @@ function extractJavaClassName(content: string): string | null {
 }
 
 async function executeCpp(_filePath: string, testInput: string, fileContent: string, dirName: string, _baseName: string): Promise<string> {
-    const tempFile = path.join(dirName, `__temp_test_${Date.now()}.cpp`);
-    const tempExe = path.join(dirName, `__temp_test_${Date.now()}`);
+    const tempFile = path.join(dirName, generateTempFileName("cpp"));
+    const tempExe = path.join(dirName, generateTempFileName("out"));
+    const inputFile = await writeTestInputFile(dirName, testInput);
 
     try {
         const testCode = `
 #include <iostream>
+#include <fstream>
 #include <string>
 using namespace std;
 
 ${fileContent}
 
 int main() {
-    string testInput = "${testInput.replace(/"/g, '\\"')}";
+    ifstream infile(${JSON.stringify(inputFile)});
+    string testInput;
+    getline(infile, testInput);
+    infile.close();
+
     cout << "Input: " << testInput << endl;
 
     // Create solution instance
@@ -340,6 +382,9 @@ int main() {
         if (await fse.pathExists(tempExe)) {
             await fse.remove(tempExe);
         }
+        if (await fse.pathExists(inputFile)) {
+            await fse.remove(inputFile);
+        }
     }
 }
 
@@ -348,18 +393,23 @@ async function executeCSharp(_filePath: string, _testInput: string, _fileContent
 }
 
 async function executeGo(_filePath: string, testInput: string, fileContent: string, dirName: string): Promise<string> {
-    const tempFile = path.join(dirName, `__temp_test_${Date.now()}.go`);
+    const tempFile = path.join(dirName, generateTempFileName("go"));
+    const inputFile = await writeTestInputFile(dirName, testInput);
 
     try {
         const testCode = `
 package main
 
-import "fmt"
+import (
+    "fmt"
+    "io/ioutil"
+)
 
 ${fileContent}
 
 func main() {
-    testInput := "${testInput.replace(/"/g, '\\"')}"
+    data, _ := ioutil.ReadFile(${JSON.stringify(inputFile)})
+    testInput := string(data)
     fmt.Println("Input:", testInput)
 
     // Note: You would need to call the appropriate function here
@@ -374,6 +424,9 @@ func main() {
     } finally {
         if (await fse.pathExists(tempFile)) {
             await fse.remove(tempFile);
+        }
+        if (await fse.pathExists(inputFile)) {
+            await fse.remove(inputFile);
         }
     }
 }
