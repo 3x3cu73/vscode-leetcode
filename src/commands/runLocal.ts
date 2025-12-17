@@ -19,7 +19,7 @@ export async function runLocal(uri?: vscode.Uri): Promise<void> {
 
         // Read the file content
         const fileContent: string = await fse.readFile(filePath, "utf-8");
-        
+
         // Extract problem metadata
         const metadata = extractMetadata(fileContent);
         if (!metadata) {
@@ -41,7 +41,7 @@ export async function runLocal(uri?: vscode.Uri): Promise<void> {
 
         // Execute based on language
         const result = await executeLocalTest(filePath, language, testInput, fileContent);
-        
+
         // Show results in output channel
         leetCodeChannel.show();
         leetCodeChannel.appendLine("=".repeat(60));
@@ -57,19 +57,19 @@ export async function runLocal(uri?: vscode.Uri): Promise<void> {
     }
 }
 
-interface ProblemMetadata {
+interface IProblemMetadata {
     app: string;
     id: string;
     lang: string;
 }
 
-function extractMetadata(content: string): ProblemMetadata | null {
+function extractMetadata(content: string): IProblemMetadata | null {
     // Match pattern: @lc app=leetcode id=1 lang=python3
     const matchResult: RegExpMatchArray | null = content.match(/@lc app=(.*) id=(.*) lang=(.*)/);
     if (!matchResult) {
         return null;
     }
-    
+
     return {
         app: matchResult[1],
         id: matchResult[2],
@@ -96,7 +96,7 @@ async function promptForTestInput(): Promise<string | undefined> {
     const choice = await vscode.window.showQuickPick(picks, {
         placeHolder: "How would you like to provide test input?",
     });
-    
+
     if (!choice) {
         return undefined;
     }
@@ -116,7 +116,7 @@ async function promptForTestInput(): Promise<string | undefined> {
                 "All files": ["*"],
             },
         });
-        
+
         if (files && files.length > 0) {
             return await fse.readFile(files[0].fsPath, "utf-8");
         }
@@ -129,7 +129,7 @@ async function executeLocalTest(filePath: string, language: string, testInput: s
     const ext = path.extname(filePath);
     const baseName = path.basename(filePath, ext);
     const dirName = path.dirname(filePath);
-    
+
     switch (language) {
         case "python":
         case "python3":
@@ -154,7 +154,7 @@ async function executeLocalTest(filePath: string, language: string, testInput: s
 async function executePython(filePath: string, testInput: string, fileContent: string): Promise<string> {
     // Extract the solution class/function
     const tempFile = path.join(path.dirname(filePath), `__temp_test_${Date.now()}.py`);
-    
+
     try {
         // Create a test runner
         const testCode = `
@@ -166,7 +166,7 @@ if __name__ == "__main__":
     # Parse input (assuming it's in JSON format or simple values)
     test_input = ${JSON.stringify(testInput)}
     print("Input:", test_input)
-    
+
     # Try to parse as JSON
     try:
         args = json.loads(test_input)
@@ -174,19 +174,19 @@ if __name__ == "__main__":
             args = [args]
     except:
         args = [test_input]
-    
+
     # Find the solution class
     solution = Solution()
     # Get first method that doesn't start with __
     method_name = [m for m in dir(solution) if not m.startswith('_')][0]
     method = getattr(solution, method_name)
-    
+
     result = method(*args) if isinstance(args, list) else method(args)
     print("Output:", result)
 `;
-        
+
         await fse.writeFile(tempFile, testCode);
-        
+
         return await executeCommand("python3", [tempFile]);
     } catch (error) {
         // Try python if python3 doesn't exist
@@ -205,7 +205,7 @@ if __name__ == "__main__":
 
 async function executeJavaScript(filePath: string, testInput: string, fileContent: string): Promise<string> {
     const tempFile = path.join(path.dirname(filePath), `__temp_test_${Date.now()}.js`);
-    
+
     try {
         const testCode = `
 ${fileContent}
@@ -237,9 +237,9 @@ if (typeof Solution !== 'undefined') {
 
 console.log("Output:", result);
 `;
-        
+
         await fse.writeFile(tempFile, testCode);
-        
+
         return await executeCommand("node", [tempFile]);
     } finally {
         if (await fse.pathExists(tempFile)) {
@@ -254,9 +254,9 @@ async function executeJava(_filePath: string, testInput: string, fileContent: st
     if (!className) {
         throw new Error("Could not find Java class name");
     }
-    
+
     const tempFile = path.join(dirName, `${className}_Test.java`);
-    
+
     try {
         const testCode = `
 import java.util.*;
@@ -267,21 +267,21 @@ class ${className}_Test {
     public static void main(String[] args) {
         String testInput = "${testInput.replace(/"/g, '\\"')}";
         System.out.println("Input: " + testInput);
-        
+
         // Create solution instance
         Solution solution = new Solution();
         // Note: You would need to call the appropriate method here
-        
+
         System.out.println("Output: [Java execution requires manual setup]");
     }
 }
 `;
-        
+
         await fse.writeFile(tempFile, testCode);
-        
+
         // Compile
         await executeCommand("javac", [tempFile]);
-        
+
         // Run
         return await executeCommand("java", ["-cp", dirName, `${className}_Test`]);
     } finally {
@@ -304,7 +304,7 @@ function extractJavaClassName(content: string): string | null {
 async function executeCpp(_filePath: string, testInput: string, fileContent: string, dirName: string, _baseName: string): Promise<string> {
     const tempFile = path.join(dirName, `__temp_test_${Date.now()}.cpp`);
     const tempExe = path.join(dirName, `__temp_test_${Date.now()}`);
-    
+
     try {
         const testCode = `
 #include <iostream>
@@ -316,21 +316,21 @@ ${fileContent}
 int main() {
     string testInput = "${testInput.replace(/"/g, '\\"')}";
     cout << "Input: " << testInput << endl;
-    
+
     // Create solution instance
     Solution solution;
     // Note: You would need to call the appropriate method here
-    
+
     cout << "Output: [C++ execution requires manual setup]" << endl;
     return 0;
 }
 `;
-        
+
         await fse.writeFile(tempFile, testCode);
-        
+
         // Compile
         await executeCommand("g++", ["-o", tempExe, tempFile]);
-        
+
         // Run
         return await executeCommand(tempExe, []);
     } finally {
@@ -349,7 +349,7 @@ async function executeCSharp(_filePath: string, _testInput: string, _fileContent
 
 async function executeGo(_filePath: string, testInput: string, fileContent: string, dirName: string): Promise<string> {
     const tempFile = path.join(dirName, `__temp_test_${Date.now()}.go`);
-    
+
     try {
         const testCode = `
 package main
@@ -361,15 +361,15 @@ ${fileContent}
 func main() {
     testInput := "${testInput.replace(/"/g, '\\"')}"
     fmt.Println("Input:", testInput)
-    
+
     // Note: You would need to call the appropriate function here
-    
+
     fmt.Println("Output: [Go execution requires manual setup]")
 }
 `;
-        
+
         await fse.writeFile(tempFile, testCode);
-        
+
         return await executeCommand("go", ["run", tempFile]);
     } finally {
         if (await fse.pathExists(tempFile)) {
