@@ -6,6 +6,7 @@ import { codeLensController } from "./codelens/CodeLensController";
 import * as cache from "./commands/cache";
 import { switchDefaultLanguage } from "./commands/language";
 import * as plugin from "./commands/plugin";
+import * as runLocal from "./commands/runLocal";
 import * as session from "./commands/session";
 import * as show from "./commands/show";
 import * as star from "./commands/star";
@@ -83,6 +84,16 @@ export async function activate(context: vscode.ExtensionContext): Promise<void> 
                     }),
                 });
                 return test.testSolution(uri);
+            }),
+            vscode.commands.registerCommand("leetcode.runLocal", (uri?: vscode.Uri) => {
+                TrackData.report({
+                    event_key: `vscode_runLocal`,
+                    type: "click",
+                    extra: JSON.stringify({
+                        path: uri?.path,
+                    }),
+                });
+                return runLocal.runLocal(uri);
             }),
             vscode.commands.registerCommand("leetcode.submitSolution", (uri?: vscode.Uri) => {
                 TrackData.report({
