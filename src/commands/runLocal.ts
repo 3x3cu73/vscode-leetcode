@@ -197,7 +197,11 @@ if __name__ == "__main__":
     # Find the solution class
     solution = Solution()
     # Get first method that doesn't start with __
-    method_name = [m for m in dir(solution) if not m.startswith('_')][0]
+    methods = [m for m in dir(solution) if not m.startswith('_')]
+    if not methods:
+        print("Error: No public methods found in Solution class")
+        sys.exit(1)
+    method_name = methods[0]
     method = getattr(solution, method_name)
 
     result = method(*args) if isinstance(args, list) else method(args)
@@ -255,6 +259,10 @@ let result;
 if (typeof Solution !== 'undefined') {
     const solution = new Solution();
     const methodName = Object.getOwnPropertyNames(Solution.prototype).find(m => m !== 'constructor');
+    if (!methodName) {
+        console.error("Error: No public methods found in Solution class");
+        process.exit(1);
+    }
     result = solution[methodName](...args);
 } else {
     // Try to find a function in the file
@@ -402,13 +410,13 @@ package main
 
 import (
     "fmt"
-    "io/ioutil"
+    "os"
 )
 
 ${fileContent}
 
 func main() {
-    data, _ := ioutil.ReadFile(${JSON.stringify(inputFile)})
+    data, _ := os.ReadFile(${JSON.stringify(inputFile)})
     testInput := string(data)
     fmt.Println("Input:", testInput)
 
@@ -433,6 +441,10 @@ func main() {
 
 async function executeCommand(command: string, args: string[]): Promise<string> {
     return new Promise((resolve, reject) => {
+        // Note: shell: true is safe here because:
+        // 1. command is a hardcoded string (python3, node, javac, etc.)
+        // 2. args are file paths that have been properly escaped with JSON.stringify
+        // 3. user input is written to files, not passed as command arguments
         const child = cp.spawn(command, args, {
             shell: true,
             cwd: process.cwd(),
