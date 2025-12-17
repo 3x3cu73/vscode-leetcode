@@ -44,6 +44,10 @@ Thanks for [@yihong0618](https://github.com/yihong0618) provided a workaround wh
 
 ## Features
 
+### ⭐ NEW: Run Code Locally
+
+Execute your LeetCode solutions locally for faster debugging without submitting to LeetCode servers! Supports Python, JavaScript, Java, C++, and more. [Learn more →](./docs/RUN_LOCAL.md)
+
 ### Sign In/Out
 
 <p align="center">
@@ -98,15 +102,18 @@ Thanks for [@yihong0618](https://github.com/yihong0618) provided a workaround wh
   <img src="https://raw.githubusercontent.com/LeetCode-OpenSource/vscode-leetcode/master/docs/imgs/shortcuts.png" alt="Editor Shortcuts" />
 </p>
 
-- The extension supports 5 editor shortcuts (aka Code Lens):
+- The extension supports 6 editor shortcuts (aka Code Lens):
 
   - `Submit`: Submit your answer to LeetCode.
   - `Test`: Test your answer with customized test cases.
+  - `Run Local` ⭐ **NEW**: Run your code locally for faster debugging without submitting to LeetCode servers.
   - `Star/Unstar`: Star or unstar the current problem.
   - `Solution`: Show the top voted solution for the current problem.
   - `Description`: Show the problem description page.
 
-  > Note: You can customize the shortcuts using the setting: `leetcode.editor.shortcuts`. By default, only `Submit` and `Test` shortcuts are enabled.
+  > Note: You can customize the shortcuts using the setting: `leetcode.editor.shortcuts`. By default, `Submit`, `Test`, and `Run Local` shortcuts are enabled.
+  >
+  > See [Run Local Documentation](./docs/RUN_LOCAL.md) for more details about the local execution feature.
 
 ---
 
